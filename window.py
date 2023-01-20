@@ -4,6 +4,7 @@ import sys
 from string import ascii_lowercase, ascii_uppercase, digits
 from client import Client
 from toolkit import SERVER, PORT
+from toolkit import *
 
 
 ALLOWED_SYMBOLS = ascii_uppercase + ascii_lowercase + digits + '_'
@@ -28,9 +29,53 @@ def check_room_name(name):
     return non_empty
 
 
-def error(err):
-    error_dialog = QErrorMessage(err)
-    error_dialog.show()
+def error(parent, msg, title='Ошибка!'):
+    QMessageBox.about(parent, title, msg)
+
+
+def strweight(s):
+    for i in s:
+        if i not in [' ', '\n']:
+            return True
+    return False
+
+
+class ChatWindow(QWidget):
+    def __init__(self, client):
+        QWidget.__init__(self)
+        self.resize(800, 600)
+        self.setWindowTitle('Пробный чат')
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+        self.textbox = QPlainTextEdit()
+        self.textbox.setReadOnly(True)
+        self.entry = QLineEdit()
+        layout.addWidget(self.textbox)
+        layout.addWidget(self.entry)
+        button('Отправить', self.send, layout)
+        self.client = client
+        self.client.start_loop(self.loop)
+    
+    def loop(self):
+        print('LOOP ITER')
+        msg = self.client.recv()
+        print('bloody nose!!!')
+        author, text = msg['author'], msg['msg']
+        self.append_chat(text, author)
+
+    def send(self):
+        v = self.entry.text()
+        if not strweight(v):
+            return
+        self.entry.setText('')
+        self.client.send({
+            'author': '123',
+            'msg': v
+        })
+
+    def append_chat(self, text, author):
+        s = f'{author}: {text}'
+        self.textbox.appendPlainText(s + '\n')
 
 
 class Inputbox(QWidget):
@@ -70,9 +115,11 @@ class Window(QWidget):
         button('Подключиться', self.connect, bottom)
         layout.addWidget(self.listwidget)
         layout.addLayout(bottom)
-
         self.client = Client(SERVER, PORT)
+        self.refresh()
         
+    def on_recv(self, msg):
+        print('HEEEEEY', msg)
 
     def create(self):
         self.input_box = Inputbox('Введите название комнаты', 
@@ -80,13 +127,48 @@ class Window(QWidget):
         self.input_box.show()
         
     def _create_on_input(self, value):
-        print(value)
+        self.client.send({
+            'name': value
+        }, T.CREATE_ROOM)
+        
+        self.client.recv({
+            T.SUCCESS: self.refresh,
+            T.REJECT: lambda: error(self, 'Ошибка создания!')
+        })
+
+    def get_selected(self):
+        idx_list = self.listwidget.selectedIndexes()
+        if not idx_list:
+            return None
+        return idx_list[0].row()
 
     def connect(self):
-        pass
+        idx = self.get_selected()
+        if idx is None:
+            return error(self, 'Необходимо выбрать комнату!')
+
+        room_name = self.last_refresh['rooms'][idx]
+
+        self.client.send({
+            'name': room_name
+        }, T.JOIN_ROOM)
+
+        self.client.recv({
+            T.SUCCESS: self.done,
+            T.REJECT: lambda: error(self, 'Что-то пошло не так...')
+        })
+
+    def done(self):
+        self.app = ChatWindow(self.client)
+        self.app.show()
 
     def refresh(self):
-        pass
+        data = self.client.get_room_list()
+        self.last_refresh = data
+        self.listwidget.clear()
+        self.listwidget.addItems([
+            f'{a} ({c}/{b})' for a, b, c in zip(*data.values())
+        ])
 
 
 app = QApplication(sys.argv)
