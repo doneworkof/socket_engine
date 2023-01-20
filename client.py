@@ -21,7 +21,7 @@ class Client:
             'status': 'sender',
             'idx': idx
         })
-
+    
     def send(self, data, *meta_tags):
         data = add_meta(data, *meta_tags)
         h_send(self.sender, data)
@@ -32,7 +32,7 @@ class Client:
         self.recver.close()
 
     def get_room_list(self):
-        self.send(meta(T.GET_ROOM_LIST))
+        self.send({}, T.GET_ROOM_LIST)
         return self.recv()
     
     def join_room(self, name):
@@ -67,7 +67,7 @@ class Client:
     def _loop(self, func):
         while True:
             cb = func()
-            if not cb:
+            if cb:
                 break
 
     def start_loop(self, loop_func):

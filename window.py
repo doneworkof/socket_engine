@@ -59,7 +59,6 @@ class ChatWindow(QWidget):
     def loop(self):
         print('LOOP ITER')
         msg = self.client.recv()
-        print('bloody nose!!!')
         author, text = msg['author'], msg['msg']
         self.append_chat(text, author)
 
@@ -75,7 +74,7 @@ class ChatWindow(QWidget):
 
     def append_chat(self, text, author):
         s = f'{author}: {text}'
-        self.textbox.appendPlainText(s + '\n')
+        print('SHOULD BE IN CHUT', s)
 
 
 class Inputbox(QWidget):

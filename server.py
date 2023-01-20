@@ -52,35 +52,31 @@ class Room:
     def add_client(self, client):
         if len(self.clients) >= self.max_capacity():
             return False
-        self.clients[addr] = conn
+        self.clients[client.idx] = client
         return True
-
-    def get_conn(self, addr):
-        return self.clients[addr]
 
     def get_all_addr(self):
         return list(self.clients.keys())
 
     def broadcast(self, data, exclude=[]):
-        for addr, conn in self.clients.items():
-            if addr in exclude:
+        for client in self.clients.values():
+            if client.idx in exclude:
                 continue
             try:
-                h_send(conn, data)
+                h_send(client.recver, data)
             except Exception as ex:
                 print(f'There is an error in room {self.name}: {ex}')
                 self.clear()
     
     def close(self):
-        for conn in self.clients.values():
-            self.server.disconnect(conn)
+        for client in self.clients.values():
+            self.server.disconnect(client)
         self.clients = {}
     
     def handle(self, client, data):
-        print(addr, data)
-        if addr not in self.clients:
+        if client.idx not in self.clients:
             return False
-        self.broadcast(data)#, [addr])
+        self.broadcast(data)
         return True
 
 
@@ -95,9 +91,6 @@ class Server:
         self.current_idx = 0
         self.rooms = {}
         self.clients = {}
-
-    def set_client_room(self, addr, room_name):
-        self.clients[room_name] = addr
 
     @ServerFunction(T.GET_ROOM_LIST)
     def _get_room_list(self, msg):
@@ -120,12 +113,12 @@ class Server:
 
     @ServerFunction(T.JOIN_ROOM)
     def _join_room(self, msg):
-        addr, conn = msg[UDATA_FIELD]
+        client = msg[UDATA_FIELD]
         room_name = msg['name']
         if room_name not in self.rooms:
             return meta(T.REJECT)
-        cb = self.rooms[room_name].add_client(addr, conn)
-        if cb: self.set_client_room(addr, room_name)
+        cb = self.rooms[room_name].add_client(client)
+        if cb: client.set_room(room_name)
         return meta(T.REJECT if not cb else T.SUCCESS)
 
     def _start_serv_func(self, tag, data):
@@ -147,7 +140,7 @@ class Server:
             print(meta_tag, cb)
             if cb is None:
                 continue
-            h_send(client.get_recv_sock(), cb)
+            h_send(client.recver, cb)
             success += 1
         return success > 0
 

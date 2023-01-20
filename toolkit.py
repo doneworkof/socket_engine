@@ -2,7 +2,7 @@ import json
 import socket
 
 
-PORT = 5049
+PORT = 5050
 SERVER = socket.gethostbyname(socket.gethostname())
 META_FIELD = 'META'
 UDATA_FIELD = 'UDATA'
